@@ -242,6 +242,13 @@ Node.js 版本提示），并不是真正报错的那部分，所以从里面看
 有了这份日志，我才能看到 Xcode / CocoaPods 真正报出来的错误信息，帮你精确定位并修复问题——
 盲改代码去猜错误原因效率比较低，希望你理解。
 
+### 第三轮修复（CocoaPods "No Podfile found"）
+`flutter create` 生成的 iOS 工程默认**不包含** `Podfile`（较新版本 Flutter 改成了按需生成），
+而我上一版加的"单独跑 `pod install`"步骤跑得太早，那时候 `Podfile` 还不存在，所以报错。
+现在改成先用 `flutter build ios --config-only` 专门生成 Podfile / Xcode 配置文件（不做完整编译），
+确认 Podfile 存在之后，再去做我们自己的修改（最低系统版本、Info.plist 权限说明）和 `pod install`，
+最后才执行真正的完整构建。相册权限说明文案也从中文改成了英文，避免个别 shell 环境下的编码问题。
+
 ### 关于"适配不同品牌设备"的说明
 - **Android**：不同厂商（小米/华为/OPPO/vivo 等）对后台任务、权限弹窗有各自的定制，
   但本 App 的图片处理都在前台同步完成、不需要后台权限，风险很低。用到网络请求的"IP 地址查看"
