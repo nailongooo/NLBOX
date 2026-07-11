@@ -249,6 +249,17 @@ Node.js 版本提示），并不是真正报错的那部分，所以从里面看
 确认 Podfile 存在之后，再去做我们自己的修改（最低系统版本、Info.plist 权限说明）和 `pod install`，
 最后才执行真正的完整构建。相册权限说明文案也从中文改成了英文，避免个别 shell 环境下的编码问题。
 
+### 第四轮修复（根本原因：Flutter 已从 CocoaPods 转向 Swift Package Manager）
+这次是真正找到根源了：从 **Flutter 3.44** 版本开始，iOS/macOS 的原生依赖管理默认已经从
+CocoaPods 换成了 **Swift Package Manager（SPM）**，CocoaPods 进入"维护模式"。我们的工作流
+拉取的是"最新稳定版" Flutter，大概率已经是这个新版本，所以根本不会再生成 `ios/Podfile`
+这个文件——前几轮围绕"生成/修改 Podfile"做的所有操作，都建立在过时的假设上。
+
+现在的做法是：**完全不再手动插手 CocoaPods/Podfile**，只保留跟依赖管理机制无关的 Info.plist
+权限文案补丁，其余全部交给 `flutter build ios` 自己处理（不管它内部实际用的是 SPM 还是
+CocoaPods，`flutter build` 都会自动识别并正确处理）。这是官方支持的标准路径，也是最不容易
+因为 Flutter 工具链自身演进而出问题的做法。
+
 ### 关于"适配不同品牌设备"的说明
 - **Android**：不同厂商（小米/华为/OPPO/vivo 等）对后台任务、权限弹窗有各自的定制，
   但本 App 的图片处理都在前台同步完成、不需要后台权限，风险很低。用到网络请求的"IP 地址查看"

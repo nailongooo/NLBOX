@@ -11,7 +11,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # 不写死具体版本号，直接拉取当前最新的稳定版 Flutter，避免因为版本号写错/过期导致下载失败
+      # 不写死具体版本号，直接拉取当前最新的稳定版 Flutter
       - uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
@@ -27,50 +27,25 @@ jobs:
             flutter create --platforms=ios .
           fi
 
-      - name: 拉取 Flutter 依赖
-        run: flutter pub get
-
-      # 关键一步：flutter create + pub get 之后 ios/Podfile 其实还不存在（这是较新版本
-      # Flutter 的正常行为，Podfile 改成按需生成）。用 --config-only 让 Flutter 只生成
-      # Xcode / CocoaPods 需要的配置文件（包含 Podfile 和 Generated.xcconfig），
-      # 但不做完整编译，这样我们才能在真正构建之前先拿到 Podfile 去做后续修改。
-      - name: 生成 Podfile 等配置文件（不做完整编译）
-        run: flutter build ios --release --no-codesign --config-only
-
-      - name: 确认 Podfile 已生成
+      - name: 补充 Info.plist 权限说明
         run: |
-          if [ ! -f "ios/Podfile" ]; then
-            echo "❌ ios/Podfile 仍然不存在，请把这一步完整日志发给我进一步排查"
-            exit 1
-          fi
-          echo "✅ ios/Podfile 已生成："
-          cat ios/Podfile
-
-      - name: 修正 iOS 最低系统版本 & Info.plist 权限说明
-        run: |
-          # 把 Podfile 里的最低 iOS 版本统一设为 13.0（不管原来是被注释掉的默认值，
-          # 还是已经写了别的版本号，都强制改成 13.0），避免个别插件要求的最低版本
-          # 比默认值更高导致 CocoaPods 解析失败。用 || true 保证即使某一条 sed 没匹配上
-          # 也不会导致整个步骤失败。
-          sed -i '' "s/# platform :ios, '.*'/platform :ios, '13.0'/" ios/Podfile || true
-          sed -i '' "s/platform :ios, '[0-9.]*'/platform :ios, '13.0'/" ios/Podfile || true
-
-          # 补充相册访问的隐私说明文案（部分工具会用到系统选图/选文件功能，
-          # iOS 要求 Info.plist 里必须有这个字段，否则运行时会直接崩溃）。
-          # 如果这个 key 已经存在（重复运行时），Add 会报错，所以用 || 兜底改成 Set。
+          # 部分工具会用到系统选图/选文件功能，iOS 要求 Info.plist 里必须有相册访问的
+          # 权限说明文案，否则运行时会直接崩溃。这一步跟依赖管理方式（CocoaPods 还是
+          # 较新的 Swift Package Manager）完全无关，可以放心先做。
           /usr/libexec/PlistBuddy -c "Add :NSPhotoLibraryUsageDescription string This app needs photo library access so you can pick an image to process." ios/Runner/Info.plist \
             || /usr/libexec/PlistBuddy -c "Set :NSPhotoLibraryUsageDescription This app needs photo library access so you can pick an image to process." ios/Runner/Info.plist \
             || true
 
-      - name: 安装 CocoaPods 依赖（Podfile 改动后重新安装一次，报错时日志更清晰）
-        run: |
-          cd ios
-          pod install --repo-update --verbose
-          cd ..
+      - name: 拉取 Flutter 依赖
+        run: flutter pub get
 
+      # 不再手动生成/修改 Podfile、不再手动跑 pod install。
+      # 从 Flutter 3.44 开始，iOS 原生依赖默认已经改用 Swift Package Manager 而不是
+      # CocoaPods，Podfile 很可能根本不存在，强行按 CocoaPods 的方式去处理反而会出错。
+      # 直接把这一切交给 flutter build 自己处理（不管它内部用的是 SPM 还是 CocoaPods），
+      # 这是官方支持、最不容易出问题的标准路径。
       - name: 构建未签名的 iOS Release 包
-        run: |
-          flutter build ios --release --no-codesign --verbose 2>&1 | tee ios_build.log
+        run: flutter build ios --release --no-codesign --verbose 2>&1 | tee ios_build.log
 
       - name: 打包为 Payload/*.ipa 结构
         run: |
@@ -84,7 +59,7 @@ jobs:
           name: NaiLongToolbox-unsigned-ipa
           path: build/ios/iphoneos/NaiLongToolbox-unsigned.ipa
 
-      # 不管前面成功还是失败，都会上传完整构建日志，方便排查问题
+      # 不管前面成功还是失败，都会把完整构建日志作为 Artifact 上传，方便排查问题
       - name: 上传构建日志（无论成功或失败都会执行）
         if: always()
         uses: actions/upload-artifact@v4
