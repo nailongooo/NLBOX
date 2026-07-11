@@ -18,8 +18,10 @@ dependencies:
   go_router: ^14.2.7
   # 本地键值存储：收藏 / 历史 / 设置
   shared_preferences: ^2.2.3
-  # 日期格式化
-  intl: ^0.19.0
+  # 注意：intl 不在这里手动声明版本号！
+  # flutter_localizations（下面已引入）会根据你本地 Flutter SDK 的版本，
+  # 自动传递依赖一个精确版本的 intl。如果这里手动写死版本号，
+  # 换一个 Flutter 版本时很容易和 SDK 要求的版本冲突导致 `flutter pub get` 失败。
   # UUID 生成
   uuid: ^4.4.2
   # 哈希算法 MD5/SHA1/SHA256/SHA512
@@ -52,8 +54,11 @@ dependencies:
   xml: ^6.5.0
   # 图标
   cupertino_icons: ^1.0.8
-  # 精确处理 Unicode 字符（字数统计等用到）
-  characters: ^1.3.0
+  # 注意：characters 同样不手动声明版本号！
+  # 这个包也被 Flutter 这个 SDK 包本身精确锁定了版本（TextField 等内部组件依赖它），
+  # 道理和上面的 intl 一样。代码里 `import 'package:characters/characters.dart'`
+  # 依然可以正常使用，Dart 允许 import 任何出现在依赖解析图里的包，
+  # 不要求它必须被显式声明为直接依赖。
 
 dev_dependencies:
   flutter_test:
