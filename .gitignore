@@ -1,0 +1,29 @@
+# Flutter/Dart 标准忽略文件
+.dart_tool/
+.packages
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
+pubspec.lock
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# 平台构建产物（flutter create . 生成后也会出现类似目录）
+android/.gradle/
+android/app/debug/
+android/app/profile/
+android/app/release/
+ios/Flutter/Flutter.framework
+ios/Flutter/Flutter.podspec
+ios/Pods/
+ios/.symlinks/
+**/Pods/
+*.g.dart
+
+# macOS
+.DS_Store

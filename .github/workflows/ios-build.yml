@@ -1,0 +1,40 @@
+name: Build Unsigned iOS IPA
+
+# 手动触发：在 GitHub 仓库的 Actions 标签页点击 "Run workflow" 即可
+on:
+  workflow_dispatch:
+
+jobs:
+  build-ios:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.29.0' # 建议改成你本地 `flutter --version` 输出的版本号
+          channel: 'stable'
+
+      - name: 生成 iOS 平台工程（如果尚未生成）
+        run: |
+          if [ ! -d "ios" ]; then
+            flutter create --platforms=ios .
+          fi
+
+      - run: flutter pub get
+
+      # 不进行代码签名，产出未签名的 .app，后续在电脑上用自己的 Apple ID 重新签名
+      - name: 构建未签名的 iOS Release 包
+        run: flutter build ios --release --no-codesign
+
+      - name: 打包为 Payload/*.ipa 结构
+        run: |
+          cd build/ios/iphoneos
+          mkdir -p Payload
+          cp -r Runner.app Payload/
+          zip -r NaiLongToolbox-unsigned.ipa Payload
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: NaiLongToolbox-unsigned-ipa
+          path: build/ios/iphoneos/NaiLongToolbox-unsigned.ipa
