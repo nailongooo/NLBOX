@@ -12,7 +12,7 @@ class UuidGenScreen extends ConsumerStatefulWidget {
 }
 
 class _State extends ConsumerState<UuidGenScreen> {
-  static const _uuid = Uuid();
+  static final _uuid = Uuid();
   double _count = 5;
   bool _uppercase = false;
   bool _withHyphen = true;

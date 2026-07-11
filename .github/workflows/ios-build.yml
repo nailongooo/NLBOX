@@ -7,13 +7,19 @@ on:
 jobs:
   build-ios:
     runs-on: macos-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
 
+      # 不写死具体版本号，直接拉取当前最新的稳定版 Flutter，避免因为版本号写错/过期导致下载失败
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.29.0' # 建议改成你本地 `flutter --version` 输出的版本号
           channel: 'stable'
+          cache: true
+
+      - name: 环境体检（方便排查问题，即使失败也会继续跑后面的步骤）
+        run: flutter doctor -v
+        continue-on-error: true
 
       - name: 生成 iOS 平台工程（如果尚未生成）
         run: |
@@ -21,11 +27,30 @@ jobs:
             flutter create --platforms=ios .
           fi
 
-      - run: flutter pub get
+      - name: 拉取 Flutter 依赖
+        run: flutter pub get
 
-      # 不进行代码签名，产出未签名的 .app，后续在电脑上用自己的 Apple ID 重新签名
+      - name: 修正 iOS 最低系统版本 & Info.plist 权限说明
+        run: |
+          # 把 Podfile 里被注释掉的最低 iOS 版本声明打开，并统一设为 13.0，
+          # 避免个别插件要求的最低版本比默认值更高导致 CocoaPods 解析失败。
+          sed -i '' "s/# platform :ios, '.*'/platform :ios, '13.0'/" ios/Podfile || true
+          sed -i '' "s/platform :ios, '12.0'/platform :ios, '13.0'/" ios/Podfile || true
+
+          # 补充相册访问的隐私说明文案（部分工具会用到系统选图/选文件功能，
+          # iOS 要求 Info.plist 里必须有这个字段，否则运行时会直接崩溃）。
+          /usr/libexec/PlistBuddy -c "Add :NSPhotoLibraryUsageDescription string 奶龙工具箱需要访问相册以便选择图片进行处理" ios/Runner/Info.plist || true
+
+      - name: 安装 CocoaPods 依赖（单独跑一遍，报错时日志更清晰）
+        run: |
+          cd ios
+          pod repo update
+          pod install --verbose
+          cd ..
+
       - name: 构建未签名的 iOS Release 包
-        run: flutter build ios --release --no-codesign
+        run: |
+          flutter build ios --release --no-codesign --verbose 2>&1 | tee ios_build.log
 
       - name: 打包为 Payload/*.ipa 结构
         run: |
@@ -38,3 +63,12 @@ jobs:
         with:
           name: NaiLongToolbox-unsigned-ipa
           path: build/ios/iphoneos/NaiLongToolbox-unsigned.ipa
+
+      # 不管前面成功还是失败，都会上传完整构建日志，方便排查问题
+      - name: 上传构建日志（无论成功或失败都会执行）
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-build-log
+          path: ios_build.log
+          if-no-files-found: ignore
